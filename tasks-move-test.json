@@ -1,0 +1,16 @@
+{
+  "tasks": [
+    {
+      "title": "beta",
+      "completed": false,
+      "created_date": "2026-04-24"
+    }
+  ],
+  "completed_tasks": [
+    {
+      "title": "alpha",
+      "completed": true,
+      "created_date": "2026-04-24"
+    }
+  ]
+}
