@@ -1,4 +1,5 @@
 import click
+import time
 
 try:
     from tasklist.client.server_client import (
@@ -39,6 +40,56 @@ def cli(ctx, server_url):
     ctx.obj["server_url"] = server_url
 
 
+def _parse_dd_hh_mm_ss(duration_text):
+    parts = duration_text.split(":")
+    if len(parts) != 4:
+        raise click.BadParameter("Duration must be in dd:hh:mm:ss format.")
+
+    try:
+        days, hours, minutes, seconds = (int(part) for part in parts)
+    except ValueError as exc:
+        raise click.BadParameter("Duration must contain only numbers.") from exc
+
+    if days < 0 or hours < 0 or minutes < 0 or seconds < 0:
+        raise click.BadParameter("Duration values cannot be negative.")
+    if hours > 23:
+        raise click.BadParameter("Hours must be between 0 and 23.")
+    if minutes > 59:
+        raise click.BadParameter("Minutes must be between 0 and 59.")
+    if seconds > 59:
+        raise click.BadParameter("Seconds must be between 0 and 59.")
+
+    return (days * 86400) + (hours * 3600) + (minutes * 60) + seconds
+
+
+def _format_dd_hh_mm_ss(total_seconds):
+    days = total_seconds // 86400
+    hours = (total_seconds % 86400) // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    return f"{days:02d}:{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _format_hh_mm_ss(total_seconds):
+    total_hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    return f"{total_hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _build_seconds_from_components(days, hours, minutes, seconds):
+    if days < 0 or hours < 0 or minutes < 0 or seconds < 0:
+        raise click.BadParameter("Timer values cannot be negative.")
+    if hours > 23:
+        raise click.BadParameter("Hours must be between 0 and 23.")
+    if minutes > 59:
+        raise click.BadParameter("Minutes must be between 0 and 59.")
+    if seconds > 59:
+        raise click.BadParameter("Seconds must be between 0 and 59.")
+
+    return (days * 86400) + (hours * 3600) + (minutes * 60) + seconds
+
+
 @cli.command()
 @click.argument("title")
 @click.pass_context
@@ -74,9 +125,9 @@ def list_cmd(ctx):
         click.echo(f"{i}. [{status}] {task['title']} ({created_date})")
 
 
-@cli.command(name="completed-list")
+@cli.command(name="done-list")
 @click.pass_context
-def completed_list_cmd(ctx):
+def done_list_cmd(ctx):
     server_url = ctx.obj["server_url"]
     try:
         completed_tasks = list_completed_tasks(server_url)
@@ -127,6 +178,62 @@ def delete(ctx, index):
         click.echo(f"Deleted task #{index}")
     except TaskServerError as exc:
         raise click.ClickException(str(exc)) from exc
+
+
+@cli.command()
+@click.argument("duration", required=False)
+@click.option("--days", default=0, type=int, show_default=True, help="Days to add.")
+@click.option("--hours", default=0, type=int, show_default=True, help="Hours to add (0-23).")
+@click.option("--minutes", default=0, type=int, show_default=True, help="Minutes to add (0-59).")
+@click.option("--seconds", default=0, type=int, show_default=True, help="Seconds to add (0-59).")
+@click.option("--alarm/--no-alarm", default=False, show_default=True, help="Play terminal bell when done.")
+def countdown(duration, days, hours, minutes, seconds, alarm):
+    """Run a countdown timer in dd:hh:mm:ss format or with component options."""
+    total_seconds = 0
+
+    if duration:
+        total_seconds += _parse_dd_hh_mm_ss(duration)
+
+    total_seconds += _build_seconds_from_components(days, hours, minutes, seconds)
+
+    if total_seconds == 0:
+        click.echo("Countdown is already complete: 00:00:00:00")
+        return
+
+    remaining = total_seconds
+    while remaining > 0:
+        click.echo(f"\rRemaining: {_format_dd_hh_mm_ss(remaining)}", nl=False)
+        time.sleep(1)
+        remaining -= 1
+
+    click.echo("\rRemaining: 00:00:00:00")
+    click.echo("Countdown finished.")
+    if alarm:
+        click.echo("\a\a\a", nl=False)
+        click.echo("Alarm")
+
+
+@cli.command()
+@click.option("--days", default=0, type=int, show_default=True, help="Days to add to elapsed time.")
+@click.option("--hours", default=0, type=int, show_default=True, help="Hours to add (0-23).")
+@click.option("--minutes", default=0, type=int, show_default=True, help="Minutes to add (0-59).")
+@click.option("--seconds", default=0, type=int, show_default=True, help="Seconds to add (0-59).")
+def elapsed(days, hours, minutes, seconds):
+    """Run an elapsed timer and display hh:mm:ss until stopped."""
+    offset_seconds = _build_seconds_from_components(days, hours, minutes, seconds)
+    start = time.time()
+
+    try:
+        while True:
+            elapsed_seconds = int(time.time() - start) + offset_seconds
+            click.echo(f"\rElapsed: {_format_hh_mm_ss(elapsed_seconds)}", nl=False)
+            time.sleep(1)
+    except (KeyboardInterrupt, click.Abort):
+        pass
+
+    final_elapsed = int(time.time() - start) + offset_seconds
+    click.echo("")
+    click.echo(f"Final elapsed: {_format_hh_mm_ss(final_elapsed)}")
 
 
 @cli.command()

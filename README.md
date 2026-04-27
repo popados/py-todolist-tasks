@@ -39,6 +39,21 @@ tasks --server-url http://127.0.0.1:8000 delete 1
 
 If you set environment variable `TASKLIST_SERVER_URL`, you can skip `--server-url` on each command.
 
+4. Timer commands (local CLI, no server required):
+
+```bash
+tasks countdown 00:00:01:30 --alarm
+tasks countdown --minutes 1 --seconds 30 --alarm
+tasks elapsed
+tasks elapsed --days 1 --hours 2 --minutes 30
+```
+
+- `countdown` format is `dd:hh:mm:ss`.
+- `countdown` also supports `--days`, `--hours`, `--minutes`, and `--seconds`.
+- `elapsed` displays elapsed time as `hh:mm:ss`.
+- `elapsed` supports `--days`, `--hours`, `--minutes`, and `--seconds` as a starting offset.
+- Stop `elapsed` with `Ctrl+C`.
+
 ## Installation Notes
 
 To use the Python 3.14 installation directly:
@@ -197,6 +212,13 @@ TODO:
 ### Day 02 | 4/15/2026 - Wednesday
 
 Changed to a server_client build so I can check tasks when the server is loaded.
+
+***
+
+### Day 03 | 4/24/2026 - Friday
+
+Added countdown and time elapsed to the tasks list. Changed lists to `done-list` and `list` also added command `tasks completed` that clears the task list of finished todos.
+
 
 ***
 
